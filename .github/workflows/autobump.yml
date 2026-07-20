@@ -1,0 +1,71 @@
+name: Autobump formula from PyPI
+
+# Keep Formula/rebar.rb in lockstep with the latest nava-rebar sdist on PyPI,
+# WITHOUT any stored cross-repo token: this workflow lives in the tap and writes
+# only its own repo, so the built-in GITHUB_TOKEN (contents: write) suffices —
+# matching rebar's no-stored-token release posture. It self-heals a missed
+# release (e.g. 0.8.0 left the tap at 0.7.1): the next scheduled run catches up.
+# Idempotent — a no-op when the formula already matches PyPI's latest.
+
+on:
+  schedule:
+    - cron: "17 */6 * * *" # every 6h (offset to avoid the top-of-hour stampede)
+  workflow_dispatch: {} # manual/immediate bump right after a release
+
+permissions:
+  contents: write
+
+concurrency:
+  group: autobump-formula
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tap
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Bump Formula/rebar.rb to PyPI latest (idempotent)
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, re, subprocess, sys, urllib.request
+          from pathlib import Path
+
+          PKG = "nava-rebar"
+          formula = Path("Formula/rebar.rb")
+          text = formula.read_text()
+
+          def pypi(url):
+              with urllib.request.urlopen(url, timeout=30) as r:
+                  return json.load(r)
+
+          latest = pypi(f"https://pypi.org/pypi/{PKG}/json")["info"]["version"]
+          m = re.search(r"nava_rebar-([0-9]+\.[0-9]+\.[0-9]+)\.tar\.gz", text)
+          current = m.group(1) if m else "(none)"
+          print(f"current={current} latest={latest}")
+          if current == latest:
+              print("already current — no-op")
+              sys.exit(0)
+
+          rel = pypi(f"https://pypi.org/pypi/{PKG}/{latest}/json")
+          sdist = next(u for u in rel["urls"] if u["packagetype"] == "sdist")
+          url, sha = sdist["url"], sdist["digests"]["sha256"]
+
+          new = re.sub(r'url ".*?"', f'url "{url}"', text, count=1)
+          new = re.sub(r'sha256 ".*?"', f'sha256 "{sha}"', new, count=1)
+          if new == text:
+              sys.exit("error: url/sha256 lines not found in formula")
+          formula.write_text(new)
+
+          subprocess.run(["git", "config", "user.name", "github-actions[bot]"], check=True)
+          subprocess.run(
+              ["git", "config", "user.email",
+               "41898282+github-actions[bot]@users.noreply.github.com"],
+              check=True,
+          )
+          subprocess.run(["git", "commit", "-am", f"rebar {latest}"], check=True)
+          subprocess.run(["git", "push"], check=True)
+          print(f"bumped {current} -> {latest}")
+          PY
