@@ -3,8 +3,8 @@ class Rebar < Formula
 
   desc "Event-sourced ticket system with a Jira reconciler (CLI, library, MCP)"
   homepage "https://github.com/navapbc/rebar"
-  url "https://files.pythonhosted.org/packages/3a/63/bda1369ceb37fc9173fa42d9aefb98fd74a10627a6c7ae96f9229532e0a4/nava_rebar-0.13.1.tar.gz"
-  sha256 "1d7726a6f2e8f408672b120426b9158595e683d449682934c4afe1c86c9cf473"
+  url "https://files.pythonhosted.org/packages/38/72/e78a998fab0dc89cbc1cc1662a9e7f2e3ec7494eac0b2c8b62e4e36d9650/nava_rebar-0.15.0.tar.gz"
+  sha256 "6ab8a45d91042787f456facc0b5f8937d3d4a5c543d0e14a7c58b653d59aa124"
   license "Apache-2.0"
 
   depends_on "git"        # the ticket store is a git orphan branch + worktree
